@@ -3,51 +3,46 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import csv
+import pandas
 
 if __name__ == '__main__':
     REPEATS = 30
-    generational_fitness = {}
-
+    output_file = "survivors.csv"
+    generational_fitness = []
+    generation = 1
     with open(pathlib.Path.cwd().parent / 'CW1' / 'out.txt', 'r', encoding="utf-16") as reader:
         for line in reader:
             try:
-                if not generational_fitness.get(int(line.split(" ")[0])):
-                    generational_fitness.update({int(line.split(" ")[0]): float(line.split(" ")[1])})
+                exists = list(filter(lambda g: g['generation'] == int(line.split(" ")[0]), generational_fitness))
+                if len(exists) < 1:
+                    generational_fitness.append(
+                        {'generation': int(line.split(" ")[0]), 'fitness': float(line.split(" ")[1]),
+                         "popSize": line.split(" ")[2], "numSurvivors": line.split(" ")[3],
+                         "tournamentSize": line.split(" ")[4], "probMutation": line.split(" ")[5],
+                         "probCrossover": line.split(" ")[6], "duration": float(line.split(" ")[7])})
 
                 else:
-                    generational_fitness[int(line.split(" ")[0])] = generational_fitness.get(
-                        int(line.split(" ")[0])) + float(line.split(" ")[1])
-            except ValueError:
-                if not generational_fitness.get(line.split(" ")[0]):
-                    generational_fitness.update({line.split(" ")[0]: float(line.split(" ")[1])})
-
-                else:
-                    generational_fitness[line.split(" ")[0]] = generational_fitness.get(line.split(" ")[0]) + float(
+                    generational_fitness[generational_fitness.index(exists[0])]['fitness'] = exists[0][
+                                                                                                 'fitness'] + float(
                         line.split(" ")[1])
+                    generational_fitness[generational_fitness.index(exists[0])]['duration'] = exists[0][
+                                                                                                  'duration'] + float(
+                        line.split(" ")[7])
+            except ValueError:
+                pass
 
-    for key in generational_fitness.keys():
-        generational_fitness[key] = generational_fitness[key] / REPEATS
+    for generation in generational_fitness:
+        generation['fitness'] = generation['fitness'] / REPEATS
+        generation['duration'] = generation['duration'] / REPEATS
 
-    runtime = "Runtime " + str(generational_fitness.get("exec")) + " (S)"
-    fitness = "Best Fitness " + str(generational_fitness.get("best"))
-    generational_fitness.pop("exec")
-    generational_fitness.pop("best")
+    runtime = sum(gen['duration'] for gen in generational_fitness)
+    best_fitness = min(gen['fitness'] for gen in generational_fitness)
+    for gen in generational_fitness:
+        gen.update({"overallTime": runtime, "bestFitness": best_fitness})
+    csv_file = pathlib.Path.cwd() / 'output' / 'csv' / output_file
+    if csv_file.exists():
+        pandas.DataFrame(generational_fitness).to_csv(csv_file, index=False, mode='a', header=False)
+    else:
+        pandas.DataFrame(generational_fitness).to_csv(csv_file, index=False)
 
-    fig, ax = plt.subplots()
 
-    x, y = zip(*sorted(generational_fitness.items()))
-    ax.plot(x, y)
-    ax.text(0.95, 0.95, runtime,
-            horizontalalignment='right',
-            verticalalignment='top',
-            transform=ax.transAxes)
-    ax.text(0.95, 0.85, fitness,
-            horizontalalignment='right',
-            verticalalignment='top',
-            transform=ax.transAxes)
-    ax.set(xlabel='Generation', ylabel='Fitness',
-           title='Baseline GA')
-    output_path = pathlib.Path.cwd() / 'output'
-    output_path.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_path / 'output_increased_mutation.png')
-    plt.show()
